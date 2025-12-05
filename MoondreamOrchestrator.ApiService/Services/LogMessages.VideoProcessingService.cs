@@ -66,4 +66,40 @@ public static partial class VideoProcessingServiceLogMessages
         Level = LogLevel.Warning,
         Message = "Error cleaning up temporary files")]
     public static partial void LogCleanupError(this ILogger logger, Exception ex);
+
+    [LoggerMessage(
+        EventId = 2011,
+        Level = LogLevel.Information,
+        Message = "Starting frame batch processing job {JobId} with {FrameCount} frames")]
+    public static partial void LogFrameBatchProcessingStart(this ILogger logger, string jobId, int frameCount);
+
+    [LoggerMessage(
+        EventId = 2012,
+        Level = LogLevel.Information,
+        Message = "Processing frame batch for job {JobId}")]
+    public static partial void LogFrameBatchProcessing(this ILogger logger, string jobId);
+
+    [LoggerMessage(
+        EventId = 2013,
+        Level = LogLevel.Information,
+        Message = "Frame batch processing completed for job {JobId}. Processed {FrameCount} frames, found {DetectionCount} detections")]
+    public static partial void LogFrameBatchProcessingComplete(this ILogger logger, string jobId, int frameCount, int detectionCount);
+
+    [LoggerMessage(
+        EventId = 2014,
+        Level = LogLevel.Information,
+        Message = "Frame batch processing completed for job {JobId}. No detections found")]
+    public static partial void LogFrameBatchProcessingNoDetections(this ILogger logger, string jobId);
+
+    [LoggerMessage(
+        EventId = 2015,
+        Level = LogLevel.Error,
+        Message = "Error processing frame batch for job {JobId}")]
+    public static partial void LogFrameBatchProcessingError(this ILogger logger, string jobId, Exception ex);
+
+    [LoggerMessage(
+        EventId = 2016,
+        Level = LogLevel.Information,
+        Message = "Downloading frame {FrameIndex} from {FrameUrl}")]
+    public static partial void LogFrameDownload(this ILogger logger, int frameIndex, string frameUrl);
 }

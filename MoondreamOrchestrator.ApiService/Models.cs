@@ -90,3 +90,20 @@ public readonly struct FrameUploadRequest
         ContentType = contentType;
     }
 }
+
+/// <summary>
+/// Request to process batch of pre-extracted frames with person detection
+/// </summary>
+public readonly struct FrameBatchProcessRequest
+{
+    public string[] FrameUrls { get; init; }
+    public string PersonCharacteristics { get; init; }
+    public double ConfidenceThreshold { get; init; }
+
+    public FrameBatchProcessRequest(string[] frameUrls, string personCharacteristics, double confidenceThreshold = 0.5)
+    {
+        FrameUrls = frameUrls;
+        PersonCharacteristics = personCharacteristics;
+        ConfidenceThreshold = confidenceThreshold;
+    }
+}

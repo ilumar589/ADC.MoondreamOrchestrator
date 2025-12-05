@@ -63,13 +63,30 @@ Content-Type: application/json
 ```
 Start processing a video with person detection based on characteristics.
 
-### 3. Get Job Status
+### 3. Process Frame Batch
+```
+POST /api/frames/process-batch
+Content-Type: application/json
+
+{
+  "frameUrls": [
+    "blob-storage-url-frame1",
+    "blob-storage-url-frame2",
+    "blob-storage-url-frame3"
+  ],
+  "personCharacteristics": "person wearing red shirt",
+  "confidenceThreshold": 0.5
+}
+```
+Start processing a batch of pre-extracted frames with person detection. This endpoint allows users to submit frames that have already been extracted from a video, skipping the video-to-frames conversion step.
+
+### 4. Get Job Status
 ```
 GET /api/videos/status/{jobId}
 ```
-Get the status of a video processing job.
+Get the status of a video or frame batch processing job.
 
-### 4. Detect Person in Image
+### 5. Detect Person in Image
 ```
 POST /api/detect/person
 Content-Type: multipart/form-data
@@ -104,9 +121,11 @@ The application uses struct-based DTOs for performance:
 - `VideoProcessRequest`: Request to process a video
 - `VideoProcessResponse`: Job status and results
 - `FrameUploadRequest`: Frame upload data
+- `FrameBatchProcessRequest`: Request to process a batch of pre-extracted frames
 
 ## How It Works
 
+### Video Processing Workflow
 1. **Frame Upload**: Video frames are uploaded to Azure Blob Storage via the `/api/frames/upload` endpoint
 2. **Video Processing**: Submit a video URL and person characteristics to `/api/videos/process`
 3. **Frame Extraction**: FFmpeg extracts frames from the video
@@ -114,6 +133,17 @@ The application uses struct-based DTOs for performance:
 5. **Bounding Boxes**: Detected persons meeting the confidence threshold get bounding boxes
 6. **Video Generation**: Processed frames are combined into a new video with bounding boxes
 7. **Result Storage**: The processed video is uploaded to Azure Storage
+
+### Frame Batch Processing Workflow
+1. **Pre-extracted Frames**: Users upload frames to Azure Blob Storage via `/api/frames/upload` or have them pre-stored
+2. **Batch Processing**: Submit an array of frame URLs and person characteristics to `/api/frames/process-batch`
+3. **Frame Download**: Each frame is downloaded from blob storage
+4. **Person Detection**: Each frame is sent to Moondream for person detection
+5. **Bounding Boxes**: Detected persons meeting the confidence threshold get bounding boxes
+6. **Video Generation**: Processed frames are combined into a new video with bounding boxes
+7. **Result Storage**: The processed video is uploaded to Azure Storage
+
+This dual approach provides flexibility: users can process complete videos (with automatic frame extraction) or submit pre-extracted frames directly (skipping the extraction step).
 
 ## Development Notes
 
@@ -136,22 +166,21 @@ The application uses struct-based DTOs for performance:
 
 ## Testing
 
-The solution includes comprehensive tests (19 tests, all passing):
+The solution includes comprehensive tests (23 tests, all passing):
 
 ```bash
 dotnet test
 ```
 
 Test categories:
-- **Models Tests**: Validates struct behavior and immutability
-- **MoondreamService Tests**: Tests HTTP integration and person detection logic
-- **VideoProcessingService Tests**: Validates video processing workflows
-- **API Endpoint Tests**: Integration tests for API endpoints
+- **Models Tests**: Validates struct behavior and immutability (13 tests)
+- **MoondreamService Tests**: Tests HTTP integration and person detection logic (6 tests)
+- **VideoProcessingService Tests**: Validates video processing workflows (3 tests)
+- **API Endpoint Tests**: Integration tests for API endpoints (1 test)
 
 ## Future Enhancements
 
 - Implement actual bounding box drawing (currently a placeholder)
 - Add more sophisticated video processing options
-- Support for batch processing
 - Enhanced error handling and retry logic
 - Telemetry and monitoring improvements

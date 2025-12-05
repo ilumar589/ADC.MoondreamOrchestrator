@@ -79,6 +79,24 @@ public class VideoProcessingService
         return _jobs.TryGetValue(jobId, out var response) ? response : null;
     }
 
+    /// <summary>
+    /// Start processing a batch of pre-extracted frames with person detection
+    /// </summary>
+    public virtual async Task<string> StartFrameBatchProcessingAsync(string[] frameUrls, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken = default)
+    {
+        var jobId = Guid.NewGuid().ToString();
+        
+        _logger.LogFrameBatchProcessingStart(jobId, frameUrls.Length);
+
+        // Initialize job status
+        _jobs[jobId] = new VideoProcessResponse(jobId, "Processing", null, 0, 0);
+
+        // Start processing in background
+        _ = Task.Run(async () => await ProcessFrameBatchAsync(jobId, frameUrls, personCharacteristics, confidenceThreshold, cancellationToken), cancellationToken);
+
+        return jobId;
+    }
+
     private async Task ProcessVideoAsync(string jobId, string videoUrl, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken)
     {
         try
@@ -147,6 +165,84 @@ public class VideoProcessingService
         catch (Exception ex)
         {
             _logger.LogVideoProcessingError(jobId, ex);
+            _jobs[jobId] = new VideoProcessResponse(jobId, "Failed", null, 0, 0);
+        }
+    }
+
+    private async Task ProcessFrameBatchAsync(string jobId, string[] frameUrls, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogFrameBatchProcessing(jobId);
+
+            var containerClient = _blobServiceClient.GetBlobContainerClient("frames");
+            var outputVideoPath = Path.Combine(Path.GetTempPath(), $"{jobId}_output.mp4");
+
+            // Process frames
+            var framesProcessed = 0;
+            var detectionsFound = 0;
+            var processedFrames = new List<string>();
+
+            for (var i = 0; i < frameUrls.Length; i++)
+            {
+                var frameUrl = frameUrls[i];
+                _logger.LogFrameDownload(i, frameUrl);
+
+                // Download frame from blob storage
+                var blobName = Path.GetFileName(new Uri(frameUrl).LocalPath);
+                var blobClient = containerClient.GetBlobClient(blobName);
+
+                using var memoryStream = new MemoryStream();
+                await blobClient.DownloadToAsync(memoryStream, cancellationToken);
+                var frameData = memoryStream.ToArray();
+
+                // Process frame for person detection
+                var detections = await _moondreamService.DetectPersonAsync(frameData, personCharacteristics, cancellationToken);
+                
+                var validDetections = detections.Where(d => d.Confidence >= confidenceThreshold).ToArray();
+                if (validDetections.Length > 0)
+                {
+                    detectionsFound += validDetections.Length;
+                    var processedFrame = DrawBoundingBoxes(frameData, validDetections);
+                    var framePath = Path.Combine(Path.GetTempPath(), $"{jobId}_frame_{framesProcessed}.jpg");
+                    await File.WriteAllBytesAsync(framePath, processedFrame, cancellationToken);
+                    processedFrames.Add(framePath);
+                }
+
+                framesProcessed++;
+                
+                // Update job status
+                _jobs[jobId] = new VideoProcessResponse(jobId, "Processing", null, framesProcessed, detectionsFound);
+            }
+
+            // Create output video from processed frames
+            if (processedFrames.Count > 0)
+            {
+                await CreateVideoFromFramesAsync(processedFrames, outputVideoPath, cancellationToken);
+
+                // Upload processed video
+                var containerClient2 = _blobServiceClient.GetBlobContainerClient("videos");
+                var outputBlobClient = containerClient2.GetBlobClient($"{jobId}_output.mp4");
+                await using var outputStream = File.OpenRead(outputVideoPath);
+                await outputBlobClient.UploadAsync(outputStream, overwrite: true, cancellationToken);
+
+                // Update final status
+                _jobs[jobId] = new VideoProcessResponse(jobId, "Completed", outputBlobClient.Uri.ToString(), framesProcessed, detectionsFound);
+
+                _logger.LogFrameBatchProcessingComplete(jobId, framesProcessed, detectionsFound);
+            }
+            else
+            {
+                _jobs[jobId] = new VideoProcessResponse(jobId, "Completed", null, framesProcessed, 0);
+                _logger.LogFrameBatchProcessingNoDetections(jobId);
+            }
+
+            // Cleanup temp files
+            CleanupTempFiles(string.Empty, outputVideoPath, processedFrames);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogFrameBatchProcessingError(jobId, ex);
             _jobs[jobId] = new VideoProcessResponse(jobId, "Failed", null, 0, 0);
         }
     }

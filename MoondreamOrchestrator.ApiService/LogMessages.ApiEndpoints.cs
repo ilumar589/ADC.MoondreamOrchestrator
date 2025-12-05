@@ -48,4 +48,10 @@ public static partial class ApiEndpointLogMessages
         Level = LogLevel.Information,
         Message = "Detecting person with characteristics: {Characteristics}")]
     public static partial void LogPersonDetectionRequest(this ILogger logger, string characteristics);
+
+    [LoggerMessage(
+        EventId = 3008,
+        Level = LogLevel.Information,
+        Message = "Starting frame batch processing for {FrameCount} frames with characteristics: {Characteristics}")]
+    public static partial void LogFrameBatchProcessRequest(this ILogger logger, int frameCount, string characteristics);
 }
