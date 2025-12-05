@@ -329,6 +329,9 @@ public class VideoProcessingService
     private Task CreateVideoFromFramesAsync(List<string> framePaths, string outputPath, VideoProcessingOptions options, CancellationToken cancellationToken)
     {
         var fps = options.TargetFps ?? 1;
+        // TODO: Use options.Codec and options.Quality when creating video
+        // Current FFMpeg.JoinImageSequence API doesn't expose codec/quality parameters
+        // For production, use FFMpegArguments API for full control
         FFMpeg.JoinImageSequence(outputPath, frameRate: fps, framePaths.ToArray());
         return Task.CompletedTask;
     }

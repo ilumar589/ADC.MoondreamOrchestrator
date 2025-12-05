@@ -1,5 +1,6 @@
 using MoondreamOrchestrator.ApiService;
 using MoondreamOrchestrator.ApiService.Services;
+using MoondreamOrchestrator.ApiService.Services.Telemetry;
 using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,6 +23,21 @@ builder.Services.AddSingleton<MoondreamService>();
 builder.Services.AddSingleton<BoundingBoxDrawer>();
 builder.Services.AddSingleton<VideoFrameProcessor>();
 builder.Services.AddSingleton<VideoProcessingService>();
+
+// Add telemetry services
+builder.Services.AddSingleton<MetricsService>();
+builder.Services.AddSingleton<ITelemetryCollector>(sp =>
+{
+    var telemetryEnabled = builder.Configuration.GetValue<bool>("Telemetry:Enabled", true);
+    if (!telemetryEnabled)
+    {
+        return new NullTelemetryCollector();
+    }
+
+    var telemetryPath = builder.Configuration["Telemetry:FilePath"] ?? Path.Combine(Path.GetTempPath(), "moondream-telemetry.jsonl");
+    var logger = sp.GetRequiredService<ILogger<FileTelemetryCollector>>();
+    return new FileTelemetryCollector(telemetryPath, logger);
+});
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -171,6 +187,16 @@ app.MapPost("/api/detect/person", async (
 .WithName("DetectPerson")
 .WithSummary("Detect person in an image based on characteristics")
 .DisableAntiforgery();
+
+// Metrics endpoint
+app.MapGet("/metrics", (MetricsService metricsService) =>
+{
+    var metrics = metricsService.GetPrometheusMetrics();
+    return Results.Text(metrics, "text/plain; version=0.0.4");
+})
+.WithName("GetMetrics")
+.WithSummary("Get Prometheus-style metrics")
+.ExcludeFromDescription();
 
 app.MapDefaultEndpoints();
 
