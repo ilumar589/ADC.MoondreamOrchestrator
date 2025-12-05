@@ -127,4 +127,67 @@ public class ModelsTests
         // Assert
         detection.Confidence.Should().BeLessThan(0.5);
     }
+
+    [Fact]
+    public void FrameBatchProcessRequest_ShouldInitializeWithDefaults()
+    {
+        // Arrange
+        var frameUrls = new[] { "http://test.com/frame1.jpg", "http://test.com/frame2.jpg" };
+
+        // Act
+        var request = new FrameBatchProcessRequest(frameUrls, "person wearing blue hat");
+
+        // Assert
+        request.FrameUrls.Should().BeEquivalentTo(frameUrls);
+        request.PersonCharacteristics.Should().Be("person wearing blue hat");
+        request.ConfidenceThreshold.Should().Be(0.5); // Default value
+    }
+
+    [Fact]
+    public void FrameBatchProcessRequest_ShouldInitializeWithCustomThreshold()
+    {
+        // Arrange
+        var frameUrls = new[] { "http://test.com/frame1.jpg", "http://test.com/frame2.jpg" };
+
+        // Act
+        var request = new FrameBatchProcessRequest(frameUrls, "person wearing blue hat", 0.75);
+
+        // Assert
+        request.ConfidenceThreshold.Should().Be(0.75);
+    }
+
+    [Fact]
+    public void FrameBatchProcessRequest_ShouldHandleMultipleFrames()
+    {
+        // Arrange
+        var frameUrls = new[] 
+        { 
+            "http://test.com/frame1.jpg", 
+            "http://test.com/frame2.jpg",
+            "http://test.com/frame3.jpg",
+            "http://test.com/frame4.jpg",
+            "http://test.com/frame5.jpg"
+        };
+
+        // Act
+        var request = new FrameBatchProcessRequest(frameUrls, "person with backpack", 0.6);
+
+        // Assert
+        request.FrameUrls.Should().HaveCount(5);
+        request.FrameUrls.Should().ContainInOrder(frameUrls);
+    }
+
+    [Fact]
+    public void FrameBatchProcessRequest_ShouldBeValueType()
+    {
+        // Arrange
+        var frameUrls = new[] { "http://test.com/frame1.jpg" };
+        var request1 = new FrameBatchProcessRequest(frameUrls, "test", 0.5);
+        var request2 = new FrameBatchProcessRequest(frameUrls, "test", 0.5);
+
+        // Assert - structs are value types
+        request1.FrameUrls.Should().BeEquivalentTo(request2.FrameUrls);
+        request1.PersonCharacteristics.Should().Be(request2.PersonCharacteristics);
+        request1.ConfidenceThreshold.Should().Be(request2.ConfidenceThreshold);
+    }
 }

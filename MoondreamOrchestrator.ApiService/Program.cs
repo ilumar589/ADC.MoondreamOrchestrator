@@ -84,6 +84,31 @@ app.MapPost("/api/videos/process", async (
 .WithName("ProcessVideo")
 .WithSummary("Start processing a video with person detection");
 
+// Start frame batch processing endpoint
+app.MapPost("/api/frames/process-batch", async (
+    FrameBatchProcessRequest request,
+    VideoProcessingService videoService,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    if (request.FrameUrls == null || request.FrameUrls.Length == 0)
+    {
+        return Results.BadRequest("No frame URLs provided");
+    }
+
+    logger.LogFrameBatchProcessRequest(request.FrameUrls.Length, request.PersonCharacteristics);
+
+    var jobId = await videoService.StartFrameBatchProcessingAsync(
+        request.FrameUrls,
+        request.PersonCharacteristics,
+        request.ConfidenceThreshold,
+        cancellationToken);
+
+    return Results.Accepted($"/api/videos/status/{jobId}", new { jobId });
+})
+.WithName("ProcessFrameBatch")
+.WithSummary("Start processing a batch of pre-extracted frames with person detection");
+
 // Get video processing status endpoint
 app.MapGet("/api/videos/status/{jobId}", (
     string jobId,
