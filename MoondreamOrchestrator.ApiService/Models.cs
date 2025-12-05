@@ -37,6 +37,37 @@ public readonly struct PersonDetection
 }
 
 /// <summary>
+/// Video processing options
+/// </summary>
+public readonly struct VideoProcessingOptions
+{
+    public int? TargetFps { get; init; }
+    public string? TargetResolution { get; init; } // format: "widthxheight" e.g., "1920x1080"
+    public bool PreserveAspectRatio { get; init; }
+    public bool Letterbox { get; init; }
+    public bool Grayscale { get; init; }
+    public string? Codec { get; init; } // e.g., "libx264", "libx265"
+    public int? Quality { get; init; } // CRF value (0-51, lower is better)
+    public bool EnableMotionDetection { get; init; }
+    public double MotionThreshold { get; init; }
+
+    public VideoProcessingOptions()
+    {
+        TargetFps = null;
+        TargetResolution = null;
+        PreserveAspectRatio = true;
+        Letterbox = false;
+        Grayscale = false;
+        Codec = null;
+        Quality = null;
+        EnableMotionDetection = false;
+        MotionThreshold = 0.05; // 5% difference threshold
+    }
+
+    public static VideoProcessingOptions Default => new();
+}
+
+/// <summary>
 /// Request to process video with person detection
 /// </summary>
 public readonly struct VideoProcessRequest
@@ -44,12 +75,14 @@ public readonly struct VideoProcessRequest
     public string VideoUrl { get; init; }
     public string PersonCharacteristics { get; init; }
     public double ConfidenceThreshold { get; init; }
+    public VideoProcessingOptions? ProcessingOptions { get; init; }
 
-    public VideoProcessRequest(string videoUrl, string personCharacteristics, double confidenceThreshold = 0.5)
+    public VideoProcessRequest(string videoUrl, string personCharacteristics, double confidenceThreshold = 0.5, VideoProcessingOptions? processingOptions = null)
     {
         VideoUrl = videoUrl;
         PersonCharacteristics = personCharacteristics;
         ConfidenceThreshold = confidenceThreshold;
+        ProcessingOptions = processingOptions;
     }
 }
 
@@ -99,11 +132,13 @@ public readonly struct FrameBatchProcessRequest
     public string[] FrameUrls { get; init; }
     public string PersonCharacteristics { get; init; }
     public double ConfidenceThreshold { get; init; }
+    public VideoProcessingOptions? ProcessingOptions { get; init; }
 
-    public FrameBatchProcessRequest(string[] frameUrls, string personCharacteristics, double confidenceThreshold = 0.5)
+    public FrameBatchProcessRequest(string[] frameUrls, string personCharacteristics, double confidenceThreshold = 0.5, VideoProcessingOptions? processingOptions = null)
     {
         FrameUrls = frameUrls;
         PersonCharacteristics = personCharacteristics;
         ConfidenceThreshold = confidenceThreshold;
+        ProcessingOptions = processingOptions;
     }
 }

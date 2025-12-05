@@ -10,12 +10,14 @@ public class MoondreamService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<MoondreamService> _logger;
+    private readonly RetryPolicy _retryPolicy;
     private readonly string _moondreamUrl;
 
-    public MoondreamService(HttpClient httpClient, ILogger<MoondreamService> logger, IConfiguration configuration)
+    public MoondreamService(HttpClient httpClient, ILogger<MoondreamService> logger, RetryPolicy retryPolicy, IConfiguration configuration)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _retryPolicy = retryPolicy;
         _moondreamUrl = configuration["Moondream:Url"] ?? "http://localhost:5000";
     }
 
@@ -28,32 +30,43 @@ public class MoondreamService
         {
             _logger.LogDetectionRequest(characteristics);
 
-            var requestContent = new
+            var retryOptions = new RetryOptions
             {
-                image = Convert.ToBase64String(imageData),
-                prompt = $"Detect person with these characteristics: {characteristics}. Return bounding box coordinates.",
-                task = "object_detection"
+                MaxAttempts = 3,
+                InitialDelay = TimeSpan.FromSeconds(0.5),
+                MaxDelay = TimeSpan.FromSeconds(10),
+                PerAttemptTimeout = TimeSpan.FromSeconds(30)
             };
 
-            var json = JsonSerializer.Serialize(requestContent);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync($"{_moondreamUrl}/detect", content, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-            var result = JsonSerializer.Deserialize<MoondreamResponse>(responseJson);
-
-            if (result?.Detections == null)
+            return await _retryPolicy.ExecuteAsync(async ct =>
             {
-                return Array.Empty<PersonDetection>();
-            }
+                var requestContent = new
+                {
+                    image = Convert.ToBase64String(imageData),
+                    prompt = $"Detect person with these characteristics: {characteristics}. Return bounding box coordinates.",
+                    task = "object_detection"
+                };
 
-            return result.Detections.Select(d => new PersonDetection(
-                characteristics,
-                new BoundingBox(d.Box.X, d.Box.Y, d.Box.Width, d.Box.Height),
-                d.Confidence
-            )).ToArray();
+                var json = JsonSerializer.Serialize(requestContent);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync($"{_moondreamUrl}/detect", content, ct);
+                response.EnsureSuccessStatusCode();
+
+                var responseJson = await response.Content.ReadAsStringAsync(ct);
+                var result = JsonSerializer.Deserialize<MoondreamResponse>(responseJson);
+
+                if (result?.Detections == null)
+                {
+                    return Array.Empty<PersonDetection>();
+                }
+
+                return result.Detections.Select(d => new PersonDetection(
+                    characteristics,
+                    new BoundingBox(d.Box.X, d.Box.Y, d.Box.Width, d.Box.Height),
+                    d.Confidence
+                )).ToArray();
+            }, retryOptions, RetryPolicy.CreateHttpRetryPredicate(), cancellationToken);
         }
         catch (Exception ex)
         {

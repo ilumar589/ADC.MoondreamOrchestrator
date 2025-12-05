@@ -177,10 +177,123 @@ Test categories:
 - **MoondreamService Tests**: Tests HTTP integration and person detection logic (6 tests)
 - **VideoProcessingService Tests**: Validates video processing workflows (3 tests)
 - **API Endpoint Tests**: Integration tests for API endpoints (1 test)
+- **Bounding Box Drawing Tests**: Tests actual bounding box rendering (10 tests)
+- **Video Processing Options Tests**: Tests new video processing features (5 tests)
+- **Retry Policy Tests**: Tests retry logic and error handling (13 tests)
 
-## Future Enhancements
+**Total: 51 tests, all passing ✅**
 
-- Implement actual bounding box drawing (currently a placeholder)
-- Add more sophisticated video processing options
-- Enhanced error handling and retry logic
-- Telemetry and monitoring improvements
+## Advanced Features
+
+### Bounding Box Drawing
+
+The application now includes production-ready bounding box drawing with configurable options:
+
+```json
+{
+  "processingOptions": {
+    "targetResolution": "1920x1080",
+    "preserveAspectRatio": true,
+    "letterbox": true
+  }
+}
+```
+
+Features:
+- Configurable colors, thickness, and rounded corners
+- Label text with class name and confidence scores
+- Per-class color support or deterministic color generation
+- Cross-platform using SkiaSharp
+
+### Video Processing Options
+
+New sophisticated options for video processing:
+
+```json
+{
+  "videoUrl": "https://...",
+  "personCharacteristics": "person with red shirt",
+  "confidenceThreshold": 0.7,
+  "processingOptions": {
+    "targetFps": 24,
+    "targetResolution": "1280x720",
+    "preserveAspectRatio": true,
+    "letterbox": true,
+    "grayscale": false,
+    "codec": "libx264",
+    "quality": 23,
+    "enableMotionDetection": true,
+    "motionThreshold": 0.05
+  }
+}
+```
+
+Options:
+- **targetFps**: Output frame rate (resamples frames)
+- **targetResolution**: Output resolution (e.g., "1920x1080")
+- **preserveAspectRatio**: Maintain aspect ratio when resizing
+- **letterbox**: Add black bars if needed
+- **grayscale**: Convert to grayscale
+- **codec**: Video codec (default: libx264)
+- **quality**: CRF quality (0-51, lower is better)
+- **enableMotionDetection**: Skip near-duplicate frames
+- **motionThreshold**: Similarity threshold (0.0-1.0)
+
+### Error Handling and Retry Logic
+
+Automatic retry with exponential backoff for:
+- Moondream API calls
+- Azure Blob Storage operations
+- Network timeouts and transient errors
+
+Configuration in code:
+```csharp
+var retryOptions = new RetryOptions
+{
+    MaxAttempts = 3,
+    InitialDelay = TimeSpan.FromSeconds(1),
+    MaxDelay = TimeSpan.FromSeconds(30),
+    BackoffMultiplier = 2.0,
+    UseJitter = true
+};
+```
+
+### Telemetry and Monitoring
+
+#### Configuration
+
+Add to `appsettings.json`:
+```json
+{
+  "Telemetry": {
+    "Enabled": true,
+    "FilePath": "logs/telemetry.jsonl"
+  }
+}
+```
+
+#### Metrics Endpoint
+
+Access Prometheus-style metrics at:
+```
+GET /metrics
+```
+
+Sample output:
+```
+frames_processed_count 150
+detections_found_count 45
+processing_time_seconds_count 10
+processing_time_seconds_sum 125.5
+processing_time_seconds{quantile="0.5"} 12.1
+processing_time_seconds{quantile="0.95"} 18.7
+processing_time_seconds{quantile="0.99"} 22.3
+```
+
+#### Telemetry Events
+
+Telemetry events are written to JSON lines format:
+```json
+{"EventName":"VideoProcessingStarted","Timestamp":"2025-12-05T20:00:00Z","JobId":"abc-123","Properties":{},"Metrics":{}}
+{"EventName":"FrameProcessed","Timestamp":"2025-12-05T20:00:01Z","JobId":"abc-123","Metrics":{"ProcessingTimeMs":150}}
+```

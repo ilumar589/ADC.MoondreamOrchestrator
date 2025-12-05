@@ -13,13 +13,17 @@ namespace MoondreamOrchestrator.ApiService.Tests;
 public class MoondreamServiceTests
 {
     private readonly Mock<ILogger<MoondreamService>> _mockLogger;
+    private readonly Mock<ILogger<RetryPolicy>> _mockRetryLogger;
     private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly RetryPolicy _retryPolicy;
 
     public MoondreamServiceTests()
     {
         _mockLogger = new Mock<ILogger<MoondreamService>>();
+        _mockRetryLogger = new Mock<ILogger<RetryPolicy>>();
         _mockConfiguration = new Mock<IConfiguration>();
         _mockConfiguration.Setup(x => x["Moondream:Url"]).Returns("http://localhost:5000");
+        _retryPolicy = new RetryPolicy(_mockRetryLogger.Object);
     }
 
     [Fact]
@@ -51,7 +55,7 @@ public class MoondreamServiceTests
             });
 
         var httpClient = new HttpClient(mockHttpMessageHandler.Object);
-        var service = new MoondreamService(httpClient, _mockLogger.Object, _mockConfiguration.Object);
+        var service = new MoondreamService(httpClient, _mockLogger.Object, _retryPolicy, _mockConfiguration.Object);
 
         var imageData = new byte[] { 1, 2, 3, 4, 5 };
         var characteristics = "person wearing red shirt";
@@ -87,7 +91,7 @@ public class MoondreamServiceTests
             });
 
         var httpClient = new HttpClient(mockHttpMessageHandler.Object);
-        var service = new MoondreamService(httpClient, _mockLogger.Object, _mockConfiguration.Object);
+        var service = new MoondreamService(httpClient, _mockLogger.Object, _retryPolicy, _mockConfiguration.Object);
 
         var imageData = new byte[] { 1, 2, 3 };
         var characteristics = "person wearing blue hat";
@@ -115,7 +119,7 @@ public class MoondreamServiceTests
             });
 
         var httpClient = new HttpClient(mockHttpMessageHandler.Object);
-        var service = new MoondreamService(httpClient, _mockLogger.Object, _mockConfiguration.Object);
+        var service = new MoondreamService(httpClient, _mockLogger.Object, _retryPolicy, _mockConfiguration.Object);
 
         var imageData = new byte[] { 1, 2, 3 };
         var characteristics = "person";
@@ -153,7 +157,7 @@ public class MoondreamServiceTests
             });
 
         var httpClient = new HttpClient(mockHttpMessageHandler.Object);
-        var service = new MoondreamService(httpClient, _mockLogger.Object, _mockConfiguration.Object);
+        var service = new MoondreamService(httpClient, _mockLogger.Object, _retryPolicy, _mockConfiguration.Object);
 
         var imageData = new byte[] { 1, 2, 3 };
         var characteristics = "multiple people";
@@ -191,7 +195,7 @@ public class MoondreamServiceTests
             });
 
         var httpClient = new HttpClient(mockHttpMessageHandler.Object);
-        var service = new MoondreamService(httpClient, _mockLogger.Object, _mockConfiguration.Object);
+        var service = new MoondreamService(httpClient, _mockLogger.Object, _retryPolicy, _mockConfiguration.Object);
 
         // Act
         await service.DetectPersonAsync(new byte[] { 1, 2, 3 }, "test");
@@ -221,7 +225,7 @@ public class MoondreamServiceTests
             });
 
         var httpClient = new HttpClient(mockHttpMessageHandler.Object);
-        var service = new MoondreamService(httpClient, _mockLogger.Object, _mockConfiguration.Object);
+        var service = new MoondreamService(httpClient, _mockLogger.Object, _retryPolicy, _mockConfiguration.Object);
 
         // Act
         var result = await service.DetectPersonAsync(new byte[] { 1, 2, 3 }, "test");
