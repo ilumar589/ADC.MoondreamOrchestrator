@@ -9,8 +9,9 @@ A high-performance .NET 10 WebAPI application that uses a local Moondream instan
 - **Moondream Integration** for AI-powered person recognition
 - **FFmpeg Video Processing** for frame extraction and video generation
 - **Struct-based DTOs** for minimal memory allocation and high performance
-- **High-Performance Logging** with reduced abstractions
+- **High-Performance Logging** using LoggerMessage source generators (zero-allocation logging)
 - **OpenAPI/Swagger** support for API documentation
+- **Comprehensive Test Suite** with 19 passing tests
 
 ## Architecture
 
@@ -128,6 +129,24 @@ The application uses struct-based DTOs for performance:
 - Background tasks process videos asynchronously
 - Minimal API endpoints reduce overhead
 - Direct Azure Storage client usage (no additional abstractions)
+- **High-performance logging** using LoggerMessage source generators:
+  - Zero-allocation logging with compile-time code generation
+  - Structured logging with event IDs for better observability
+  - See [Microsoft documentation](https://learn.microsoft.com/en-us/dotnet/core/extensions/high-performance-logging) for details
+
+## Testing
+
+The solution includes comprehensive tests (19 tests, all passing):
+
+```bash
+dotnet test
+```
+
+Test categories:
+- **Models Tests**: Validates struct behavior and immutability
+- **MoondreamService Tests**: Tests HTTP integration and person detection logic
+- **VideoProcessingService Tests**: Validates video processing workflows
+- **API Endpoint Tests**: Integration tests for API endpoints
 
 ## Future Enhancements
 
