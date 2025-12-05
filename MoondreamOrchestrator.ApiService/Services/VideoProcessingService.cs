@@ -15,6 +15,7 @@ public class VideoProcessingService
     private readonly MoondreamService _moondreamService;
     private readonly BoundingBoxDrawer _boundingBoxDrawer;
     private readonly VideoFrameProcessor _frameProcessor;
+    private readonly RetryPolicy _retryPolicy;
     private readonly ILogger<VideoProcessingService> _logger;
     private readonly ConcurrentDictionary<string, VideoProcessResponse> _jobs;
 
@@ -23,12 +24,14 @@ public class VideoProcessingService
         MoondreamService moondreamService,
         BoundingBoxDrawer boundingBoxDrawer,
         VideoFrameProcessor frameProcessor,
+        RetryPolicy retryPolicy,
         ILogger<VideoProcessingService> logger)
     {
         _blobServiceClient = blobServiceClient;
         _moondreamService = moondreamService;
         _boundingBoxDrawer = boundingBoxDrawer;
         _frameProcessor = frameProcessor;
+        _retryPolicy = retryPolicy;
         _logger = logger;
         _jobs = new ConcurrentDictionary<string, VideoProcessResponse>();
     }
@@ -38,19 +41,29 @@ public class VideoProcessingService
     /// </summary>
     public virtual async Task<string> UploadFrameAsync(string fileName, byte[] data, string contentType, CancellationToken cancellationToken = default)
     {
+        _logger.LogFrameUpload(fileName);
+        
+        var retryOptions = new RetryOptions
+        {
+            MaxAttempts = 3,
+            InitialDelay = TimeSpan.FromSeconds(1),
+            PerAttemptTimeout = TimeSpan.FromSeconds(60)
+        };
+
         try
         {
-            _logger.LogFrameUpload(fileName);
-            
-            var containerClient = _blobServiceClient.GetBlobContainerClient("frames");
-            await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            return await _retryPolicy.ExecuteAsync(async ct =>
+            {
+                var containerClient = _blobServiceClient.GetBlobContainerClient("frames");
+                await containerClient.CreateIfNotExistsAsync(cancellationToken: ct);
 
-            var blobClient = containerClient.GetBlobClient(fileName);
-            using var stream = new MemoryStream(data);
-            await blobClient.UploadAsync(stream, overwrite: true, cancellationToken);
+                var blobClient = containerClient.GetBlobClient(fileName);
+                using var stream = new MemoryStream(data);
+                await blobClient.UploadAsync(stream, overwrite: true, ct);
 
-            _logger.LogFrameUploadSuccess(fileName);
-            return blobClient.Uri.ToString();
+                _logger.LogFrameUploadSuccess(fileName);
+                return blobClient.Uri.ToString();
+            }, retryOptions, cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {

@@ -17,6 +17,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHttpClient<MoondreamService>();
 
 // Add custom services
+builder.Services.AddSingleton<RetryPolicy>();
 builder.Services.AddSingleton<MoondreamService>();
 builder.Services.AddSingleton<BoundingBoxDrawer>();
 builder.Services.AddSingleton<VideoFrameProcessor>();
