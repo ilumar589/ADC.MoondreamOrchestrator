@@ -47,7 +47,7 @@ app.MapPost("/api/frames/upload", async (
 {
     if (file == null || file.Length == 0)
     {
-        logger.LogWarning("Invalid file upload attempt");
+        logger.LogInvalidFileUpload();
         return Results.BadRequest("No file uploaded");
     }
 
@@ -57,7 +57,7 @@ app.MapPost("/api/frames/upload", async (
 
     var url = await videoService.UploadFrameAsync(file.FileName, data, file.ContentType, cancellationToken);
     
-    logger.LogInformation("Frame uploaded successfully: {FileName} -> {Url}", file.FileName, url);
+    logger.LogFrameUploadComplete(file.FileName, url);
     return Results.Ok(new { url, fileName = file.FileName });
 })
 .WithName("UploadFrame")
@@ -71,8 +71,7 @@ app.MapPost("/api/videos/process", async (
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
-    logger.LogInformation("Starting video processing for: {VideoUrl} with characteristics: {Characteristics}", 
-        request.VideoUrl, request.PersonCharacteristics);
+    logger.LogVideoProcessRequest(request.VideoUrl, request.PersonCharacteristics);
 
     var jobId = await videoService.StartVideoProcessingAsync(
         request.VideoUrl,
@@ -95,11 +94,11 @@ app.MapGet("/api/videos/status/{jobId}", (
     
     if (status == null)
     {
-        logger.LogWarning("Job not found: {JobId}", jobId);
+        logger.LogJobNotFound(jobId);
         return Results.NotFound(new { error = "Job not found" });
     }
 
-    logger.LogInformation("Job status retrieved: {JobId} - {Status}", jobId, status.Value.Status);
+    logger.LogJobStatusRetrieved(jobId, status.Value.Status);
     return Results.Ok(status.Value);
 })
 .WithName("GetJobStatus")
@@ -115,7 +114,7 @@ app.MapPost("/api/detect/person", async (
 {
     if (image == null || image.Length == 0)
     {
-        logger.LogWarning("Invalid image upload for person detection");
+        logger.LogInvalidImageUpload();
         return Results.BadRequest("No image uploaded");
     }
 
@@ -123,7 +122,7 @@ app.MapPost("/api/detect/person", async (
     await image.CopyToAsync(memoryStream, cancellationToken);
     var imageData = memoryStream.ToArray();
 
-    logger.LogInformation("Detecting person with characteristics: {Characteristics}", characteristics);
+    logger.LogPersonDetectionRequest(characteristics);
     var detections = await moondreamService.DetectPersonAsync(imageData, characteristics, cancellationToken);
 
     return Results.Ok(new { detections = detections.Select(d => new
@@ -146,3 +145,4 @@ app.MapPost("/api/detect/person", async (
 app.MapDefaultEndpoints();
 
 app.Run();
+public partial class Program { }

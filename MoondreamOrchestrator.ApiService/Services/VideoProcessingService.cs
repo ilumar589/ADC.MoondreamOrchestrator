@@ -9,7 +9,7 @@ namespace MoondreamOrchestrator.ApiService.Services;
 /// <summary>
 /// Service for processing videos with person detection and bounding boxes
 /// </summary>
-public sealed class VideoProcessingService
+public class VideoProcessingService
 {
     private readonly BlobServiceClient _blobServiceClient;
     private readonly MoondreamService _moondreamService;
@@ -30,11 +30,11 @@ public sealed class VideoProcessingService
     /// <summary>
     /// Upload a video frame to Azure Storage
     /// </summary>
-    public async Task<string> UploadFrameAsync(string fileName, byte[] data, string contentType, CancellationToken cancellationToken = default)
+    public virtual async Task<string> UploadFrameAsync(string fileName, byte[] data, string contentType, CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger.LogInformation("Uploading frame: {FileName}", fileName);
+            _logger.LogFrameUpload(fileName);
             
             var containerClient = _blobServiceClient.GetBlobContainerClient("frames");
             await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
@@ -43,12 +43,12 @@ public sealed class VideoProcessingService
             using var stream = new MemoryStream(data);
             await blobClient.UploadAsync(stream, overwrite: true, cancellationToken);
 
-            _logger.LogInformation("Frame uploaded successfully: {FileName}", fileName);
+            _logger.LogFrameUploadSuccess(fileName);
             return blobClient.Uri.ToString();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error uploading frame: {FileName}", fileName);
+            _logger.LogFrameUploadError(fileName, ex);
             throw;
         }
     }
@@ -56,11 +56,11 @@ public sealed class VideoProcessingService
     /// <summary>
     /// Start processing a video with person detection
     /// </summary>
-    public async Task<string> StartVideoProcessingAsync(string videoUrl, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken = default)
+    public virtual async Task<string> StartVideoProcessingAsync(string videoUrl, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken = default)
     {
         var jobId = Guid.NewGuid().ToString();
         
-        _logger.LogInformation("Starting video processing job {JobId} for video {VideoUrl}", jobId, videoUrl);
+        _logger.LogVideoProcessingStart(jobId, videoUrl);
 
         // Initialize job status
         _jobs[jobId] = new VideoProcessResponse(jobId, "Processing", null, 0, 0);
@@ -74,7 +74,7 @@ public sealed class VideoProcessingService
     /// <summary>
     /// Get job status
     /// </summary>
-    public VideoProcessResponse? GetJobStatus(string jobId)
+    public virtual VideoProcessResponse? GetJobStatus(string jobId)
     {
         return _jobs.TryGetValue(jobId, out var response) ? response : null;
     }
@@ -83,7 +83,7 @@ public sealed class VideoProcessingService
     {
         try
         {
-            _logger.LogInformation("Processing video for job {JobId}", jobId);
+            _logger.LogVideoProcessing(jobId);
 
             // Download video from blob storage
             var containerClient = _blobServiceClient.GetBlobContainerClient("videos");
@@ -133,13 +133,12 @@ public sealed class VideoProcessingService
                 // Update final status
                 _jobs[jobId] = new VideoProcessResponse(jobId, "Completed", outputBlobClient.Uri.ToString(), framesProcessed, detectionsFound);
 
-                _logger.LogInformation("Video processing completed for job {JobId}. Processed {FrameCount} frames, found {DetectionCount} detections", 
-                    jobId, framesProcessed, detectionsFound);
+                _logger.LogVideoProcessingComplete(jobId, framesProcessed, detectionsFound);
             }
             else
             {
                 _jobs[jobId] = new VideoProcessResponse(jobId, "Completed", null, framesProcessed, 0);
-                _logger.LogInformation("Video processing completed for job {JobId}. No detections found", jobId);
+                _logger.LogVideoProcessingNoDetections(jobId);
             }
 
             // Cleanup temp files
@@ -147,7 +146,7 @@ public sealed class VideoProcessingService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing video for job {JobId}", jobId);
+            _logger.LogVideoProcessingError(jobId, ex);
             _jobs[jobId] = new VideoProcessResponse(jobId, "Failed", null, 0, 0);
         }
     }
@@ -172,7 +171,7 @@ public sealed class VideoProcessingService
         // Simple bounding box drawing - in production, use a proper image processing library
         // For now, return the original image
         // TODO: Implement actual bounding box drawing with System.Drawing or SkiaSharp
-        _logger.LogInformation("Drawing {Count} bounding boxes on frame", detections.Length);
+        _logger.LogDrawingBoundingBoxes(detections.Length);
         return imageData;
     }
 
@@ -197,7 +196,7 @@ public sealed class VideoProcessingService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error cleaning up temporary files");
+            _logger.LogCleanupError(ex);
         }
     }
 }

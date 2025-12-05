@@ -6,7 +6,7 @@ namespace MoondreamOrchestrator.ApiService.Services;
 /// <summary>
 /// Service for interacting with local Moondream instance
 /// </summary>
-public sealed class MoondreamService
+public class MoondreamService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<MoondreamService> _logger;
@@ -22,11 +22,11 @@ public sealed class MoondreamService
     /// <summary>
     /// Detects persons in an image based on user-defined characteristics
     /// </summary>
-    public async Task<PersonDetection[]> DetectPersonAsync(byte[] imageData, string characteristics, CancellationToken cancellationToken = default)
+    public virtual async Task<PersonDetection[]> DetectPersonAsync(byte[] imageData, string characteristics, CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger.LogInformation("Sending image to Moondream for person detection with characteristics: {Characteristics}", characteristics);
+            _logger.LogDetectionRequest(characteristics);
 
             var requestContent = new
             {
@@ -57,7 +57,7 @@ public sealed class MoondreamService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error detecting person in image");
+            _logger.LogDetectionError(ex);
             return Array.Empty<PersonDetection>();
         }
     }
