@@ -189,7 +189,13 @@ public class VideoProcessingService
                 _logger.LogFrameDownload(i, frameUrl);
 
                 // Download frame from blob storage
-                var blobName = Path.GetFileName(new Uri(frameUrl).LocalPath);
+                if (!Uri.TryCreate(frameUrl, UriKind.Absolute, out var uri))
+                {
+                    _logger.LogFrameBatchProcessingError(jobId, new ArgumentException($"Invalid frame URL: {frameUrl}"));
+                    continue;
+                }
+                
+                var blobName = Path.GetFileName(uri.LocalPath);
                 var blobClient = containerClient.GetBlobClient(blobName);
 
                 using var memoryStream = new MemoryStream();
@@ -204,7 +210,7 @@ public class VideoProcessingService
                 {
                     detectionsFound += validDetections.Length;
                     var processedFrame = DrawBoundingBoxes(frameData, validDetections);
-                    var framePath = Path.Combine(Path.GetTempPath(), $"{jobId}_frame_{framesProcessed}.jpg");
+                    var framePath = Path.Combine(Path.GetTempPath(), $"{jobId}_frame_{i}.jpg");
                     await File.WriteAllBytesAsync(framePath, processedFrame, cancellationToken);
                     processedFrames.Add(framePath);
                 }
