@@ -19,6 +19,7 @@ builder.Services.AddHttpClient<MoondreamService>();
 // Add custom services
 builder.Services.AddSingleton<MoondreamService>();
 builder.Services.AddSingleton<BoundingBoxDrawer>();
+builder.Services.AddSingleton<VideoFrameProcessor>();
 builder.Services.AddSingleton<VideoProcessingService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -78,6 +79,7 @@ app.MapPost("/api/videos/process", async (
         request.VideoUrl,
         request.PersonCharacteristics,
         request.ConfidenceThreshold,
+        request.ProcessingOptions,
         cancellationToken);
 
     return Results.Accepted($"/api/videos/status/{jobId}", new { jobId });
@@ -103,6 +105,7 @@ app.MapPost("/api/frames/process-batch", async (
         request.FrameUrls,
         request.PersonCharacteristics,
         request.ConfidenceThreshold,
+        request.ProcessingOptions,
         cancellationToken);
 
     return Results.Accepted($"/api/videos/status/{jobId}", new { jobId });

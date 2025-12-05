@@ -14,6 +14,7 @@ public class VideoProcessingService
     private readonly BlobServiceClient _blobServiceClient;
     private readonly MoondreamService _moondreamService;
     private readonly BoundingBoxDrawer _boundingBoxDrawer;
+    private readonly VideoFrameProcessor _frameProcessor;
     private readonly ILogger<VideoProcessingService> _logger;
     private readonly ConcurrentDictionary<string, VideoProcessResponse> _jobs;
 
@@ -21,11 +22,13 @@ public class VideoProcessingService
         BlobServiceClient blobServiceClient,
         MoondreamService moondreamService,
         BoundingBoxDrawer boundingBoxDrawer,
+        VideoFrameProcessor frameProcessor,
         ILogger<VideoProcessingService> logger)
     {
         _blobServiceClient = blobServiceClient;
         _moondreamService = moondreamService;
         _boundingBoxDrawer = boundingBoxDrawer;
+        _frameProcessor = frameProcessor;
         _logger = logger;
         _jobs = new ConcurrentDictionary<string, VideoProcessResponse>();
     }
@@ -59,7 +62,7 @@ public class VideoProcessingService
     /// <summary>
     /// Start processing a video with person detection
     /// </summary>
-    public virtual async Task<string> StartVideoProcessingAsync(string videoUrl, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken = default)
+    public virtual async Task<string> StartVideoProcessingAsync(string videoUrl, string personCharacteristics, double confidenceThreshold, VideoProcessingOptions? options = null, CancellationToken cancellationToken = default)
     {
         var jobId = Guid.NewGuid().ToString();
         
@@ -69,7 +72,7 @@ public class VideoProcessingService
         _jobs[jobId] = new VideoProcessResponse(jobId, "Processing", null, 0, 0);
 
         // Start processing in background
-        _ = Task.Run(async () => await ProcessVideoAsync(jobId, videoUrl, personCharacteristics, confidenceThreshold, cancellationToken), cancellationToken);
+        _ = Task.Run(async () => await ProcessVideoAsync(jobId, videoUrl, personCharacteristics, confidenceThreshold, options ?? VideoProcessingOptions.Default, cancellationToken), cancellationToken);
 
         return jobId;
     }
@@ -85,7 +88,7 @@ public class VideoProcessingService
     /// <summary>
     /// Start processing a batch of pre-extracted frames with person detection
     /// </summary>
-    public virtual async Task<string> StartFrameBatchProcessingAsync(string[] frameUrls, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken = default)
+    public virtual async Task<string> StartFrameBatchProcessingAsync(string[] frameUrls, string personCharacteristics, double confidenceThreshold, VideoProcessingOptions? options = null, CancellationToken cancellationToken = default)
     {
         var jobId = Guid.NewGuid().ToString();
         
@@ -95,12 +98,12 @@ public class VideoProcessingService
         _jobs[jobId] = new VideoProcessResponse(jobId, "Processing", null, 0, 0);
 
         // Start processing in background
-        _ = Task.Run(async () => await ProcessFrameBatchAsync(jobId, frameUrls, personCharacteristics, confidenceThreshold, cancellationToken), cancellationToken);
+        _ = Task.Run(async () => await ProcessFrameBatchAsync(jobId, frameUrls, personCharacteristics, confidenceThreshold, options ?? VideoProcessingOptions.Default, cancellationToken), cancellationToken);
 
         return jobId;
     }
 
-    private async Task ProcessVideoAsync(string jobId, string videoUrl, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken)
+    private async Task ProcessVideoAsync(string jobId, string videoUrl, string personCharacteristics, double confidenceThreshold, VideoProcessingOptions options, CancellationToken cancellationToken)
     {
         try
         {
@@ -120,21 +123,35 @@ public class VideoProcessingService
             var framesProcessed = 0;
             var detectionsFound = 0;
             var processedFrames = new List<string>();
+            byte[]? previousFrame = null;
 
-            await foreach (var frameData in ExtractFramesAsync(tempVideoPath, cancellationToken))
+            await foreach (var frameData in ExtractFramesAsync(tempVideoPath, options, cancellationToken))
             {
-                var detections = await _moondreamService.DetectPersonAsync(frameData, personCharacteristics, cancellationToken);
+                // Motion detection: skip similar frames
+                if (options.EnableMotionDetection && previousFrame != null)
+                {
+                    if (_frameProcessor.AreFramesSimilar(previousFrame, frameData, options.MotionThreshold))
+                    {
+                        continue; // Skip this frame, it's too similar to the previous one
+                    }
+                }
+
+                // Apply processing options (resize, grayscale)
+                var processedFrameData = _frameProcessor.ProcessFrame(frameData, options);
+
+                var detections = await _moondreamService.DetectPersonAsync(processedFrameData, personCharacteristics, cancellationToken);
                 
                 var validDetections = detections.Where(d => d.Confidence >= confidenceThreshold).ToArray();
                 if (validDetections.Length > 0)
                 {
                     detectionsFound += validDetections.Length;
-                    var processedFrame = DrawBoundingBoxes(frameData, validDetections);
+                    var frameWithBoxes = DrawBoundingBoxes(processedFrameData, validDetections);
                     var framePath = Path.Combine(Path.GetTempPath(), $"{jobId}_frame_{framesProcessed}.jpg");
-                    await File.WriteAllBytesAsync(framePath, processedFrame, cancellationToken);
+                    await File.WriteAllBytesAsync(framePath, frameWithBoxes, cancellationToken);
                     processedFrames.Add(framePath);
                 }
 
+                previousFrame = frameData;
                 framesProcessed++;
                 
                 // Update job status
@@ -144,7 +161,7 @@ public class VideoProcessingService
             // Create output video from processed frames
             if (processedFrames.Count > 0)
             {
-                await CreateVideoFromFramesAsync(processedFrames, outputVideoPath, cancellationToken);
+                await CreateVideoFromFramesAsync(processedFrames, outputVideoPath, options, cancellationToken);
 
                 // Upload processed video
                 var outputBlobClient = containerClient.GetBlobClient($"{jobId}_output.mp4");
@@ -172,7 +189,7 @@ public class VideoProcessingService
         }
     }
 
-    private async Task ProcessFrameBatchAsync(string jobId, string[] frameUrls, string personCharacteristics, double confidenceThreshold, CancellationToken cancellationToken)
+    private async Task ProcessFrameBatchAsync(string jobId, string[] frameUrls, string personCharacteristics, double confidenceThreshold, VideoProcessingOptions options, CancellationToken cancellationToken)
     {
         try
         {
@@ -185,6 +202,7 @@ public class VideoProcessingService
             var framesProcessed = 0;
             var detectionsFound = 0;
             var processedFrames = new List<string>();
+            byte[]? previousFrame = null;
 
             for (var i = 0; i < frameUrls.Length; i++)
             {
@@ -205,19 +223,32 @@ public class VideoProcessingService
                 await blobClient.DownloadToAsync(memoryStream, cancellationToken);
                 var frameData = memoryStream.ToArray();
 
+                // Motion detection: skip similar frames
+                if (options.EnableMotionDetection && previousFrame != null)
+                {
+                    if (_frameProcessor.AreFramesSimilar(previousFrame, frameData, options.MotionThreshold))
+                    {
+                        continue;
+                    }
+                }
+
+                // Apply processing options (resize, grayscale)
+                var processedFrameData = _frameProcessor.ProcessFrame(frameData, options);
+
                 // Process frame for person detection
-                var detections = await _moondreamService.DetectPersonAsync(frameData, personCharacteristics, cancellationToken);
+                var detections = await _moondreamService.DetectPersonAsync(processedFrameData, personCharacteristics, cancellationToken);
                 
                 var validDetections = detections.Where(d => d.Confidence >= confidenceThreshold).ToArray();
                 if (validDetections.Length > 0)
                 {
                     detectionsFound += validDetections.Length;
-                    var processedFrame = DrawBoundingBoxes(frameData, validDetections);
+                    var frameWithBoxes = DrawBoundingBoxes(processedFrameData, validDetections);
                     var framePath = Path.Combine(Path.GetTempPath(), $"{jobId}_frame_{i}.jpg");
-                    await File.WriteAllBytesAsync(framePath, processedFrame, cancellationToken);
+                    await File.WriteAllBytesAsync(framePath, frameWithBoxes, cancellationToken);
                     processedFrames.Add(framePath);
                 }
 
+                previousFrame = frameData;
                 framesProcessed++;
                 
                 // Update job status
@@ -227,7 +258,7 @@ public class VideoProcessingService
             // Create output video from processed frames
             if (processedFrames.Count > 0)
             {
-                await CreateVideoFromFramesAsync(processedFrames, outputVideoPath, cancellationToken);
+                await CreateVideoFromFramesAsync(processedFrames, outputVideoPath, options, cancellationToken);
 
                 // Upload processed video
                 var containerClient2 = _blobServiceClient.GetBlobContainerClient("videos");
@@ -256,15 +287,20 @@ public class VideoProcessingService
         }
     }
 
-    private async IAsyncEnumerable<byte[]> ExtractFramesAsync(string videoPath, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<byte[]> ExtractFramesAsync(string videoPath, VideoProcessingOptions options, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var mediaInfo = await FFProbe.AnalyseAsync(videoPath, cancellationToken: cancellationToken);
-        var frameCount = mediaInfo.PrimaryVideoStream?.Duration.TotalSeconds ?? 0;
+        var duration = mediaInfo.PrimaryVideoStream?.Duration.TotalSeconds ?? 0;
+        var fps = options.TargetFps ?? 1; // Default 1 frame per second
+
+        var frameInterval = 1.0 / fps;
+        var frameCount = (int)(duration * fps);
 
         for (var i = 0; i < frameCount; i++)
         {
+            var timestamp = TimeSpan.FromSeconds(i * frameInterval);
             var tempFramePath = Path.Combine(Path.GetTempPath(), $"temp_frame_{i}.jpg");
-            await FFMpeg.SnapshotAsync(videoPath, tempFramePath, new Size(640, 480), TimeSpan.FromSeconds(i));
+            await FFMpeg.SnapshotAsync(videoPath, tempFramePath, new Size(640, 480), timestamp);
             var frameData = await File.ReadAllBytesAsync(tempFramePath, cancellationToken);
             File.Delete(tempFramePath);
             yield return frameData;
@@ -277,11 +313,10 @@ public class VideoProcessingService
         return _boundingBoxDrawer.DrawBoundingBoxes(imageData, detections);
     }
 
-    private Task CreateVideoFromFramesAsync(List<string> framePaths, string outputPath, CancellationToken cancellationToken)
+    private Task CreateVideoFromFramesAsync(List<string> framePaths, string outputPath, VideoProcessingOptions options, CancellationToken cancellationToken)
     {
-        // Create video from frames using FFmpeg
-        // This is a simplified version - proper implementation would use FFMpegArguments
-        FFMpeg.JoinImageSequence(outputPath, frameRate: 1, framePaths.ToArray());
+        var fps = options.TargetFps ?? 1;
+        FFMpeg.JoinImageSequence(outputPath, frameRate: fps, framePaths.ToArray());
         return Task.CompletedTask;
     }
 
