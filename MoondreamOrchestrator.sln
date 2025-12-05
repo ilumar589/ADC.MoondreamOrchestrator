@@ -1,0 +1,42 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.0.0
+MinimumVisualStudioVersion = 17.8.0.0
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoondreamOrchestrator.AppHost", "MoondreamOrchestrator.AppHost\MoondreamOrchestrator.AppHost.csproj", "{43BA5770-9117-48D6-B665-0D91D0BF9016}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoondreamOrchestrator.ServiceDefaults", "MoondreamOrchestrator.ServiceDefaults\MoondreamOrchestrator.ServiceDefaults.csproj", "{DCD04AE0-3613-46FE-83F1-D32CA75DAA53}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoondreamOrchestrator.ApiService", "MoondreamOrchestrator.ApiService\MoondreamOrchestrator.ApiService.csproj", "{E1B414CA-E16C-41C5-BA7E-11D41C68386E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoondreamOrchestrator.Web", "MoondreamOrchestrator.Web\MoondreamOrchestrator.Web.csproj", "{90A0338C-585A-4080-8D9E-F0BA34D01B3D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{43BA5770-9117-48D6-B665-0D91D0BF9016}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43BA5770-9117-48D6-B665-0D91D0BF9016}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43BA5770-9117-48D6-B665-0D91D0BF9016}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43BA5770-9117-48D6-B665-0D91D0BF9016}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCD04AE0-3613-46FE-83F1-D32CA75DAA53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCD04AE0-3613-46FE-83F1-D32CA75DAA53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCD04AE0-3613-46FE-83F1-D32CA75DAA53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCD04AE0-3613-46FE-83F1-D32CA75DAA53}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1B414CA-E16C-41C5-BA7E-11D41C68386E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1B414CA-E16C-41C5-BA7E-11D41C68386E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1B414CA-E16C-41C5-BA7E-11D41C68386E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1B414CA-E16C-41C5-BA7E-11D41C68386E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{90A0338C-585A-4080-8D9E-F0BA34D01B3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90A0338C-585A-4080-8D9E-F0BA34D01B3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90A0338C-585A-4080-8D9E-F0BA34D01B3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90A0338C-585A-4080-8D9E-F0BA34D01B3D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6D093E26-47A3-4934-BD96-C5EF5ACB9F6B}
+	EndGlobalSection
+EndGlobal
