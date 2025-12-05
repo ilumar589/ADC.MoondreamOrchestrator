@@ -13,16 +13,19 @@ public class VideoProcessingService
 {
     private readonly BlobServiceClient _blobServiceClient;
     private readonly MoondreamService _moondreamService;
+    private readonly BoundingBoxDrawer _boundingBoxDrawer;
     private readonly ILogger<VideoProcessingService> _logger;
     private readonly ConcurrentDictionary<string, VideoProcessResponse> _jobs;
 
     public VideoProcessingService(
         BlobServiceClient blobServiceClient,
         MoondreamService moondreamService,
+        BoundingBoxDrawer boundingBoxDrawer,
         ILogger<VideoProcessingService> logger)
     {
         _blobServiceClient = blobServiceClient;
         _moondreamService = moondreamService;
+        _boundingBoxDrawer = boundingBoxDrawer;
         _logger = logger;
         _jobs = new ConcurrentDictionary<string, VideoProcessResponse>();
     }
@@ -270,11 +273,8 @@ public class VideoProcessingService
 
     private byte[] DrawBoundingBoxes(byte[] imageData, PersonDetection[] detections)
     {
-        // Simple bounding box drawing - in production, use a proper image processing library
-        // For now, return the original image
-        // TODO: Implement actual bounding box drawing with System.Drawing or SkiaSharp
         _logger.LogDrawingBoundingBoxes(detections.Length);
-        return imageData;
+        return _boundingBoxDrawer.DrawBoundingBoxes(imageData, detections);
     }
 
     private Task CreateVideoFromFramesAsync(List<string> framePaths, string outputPath, CancellationToken cancellationToken)

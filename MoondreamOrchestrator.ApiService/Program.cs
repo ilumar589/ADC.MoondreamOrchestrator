@@ -18,6 +18,7 @@ builder.Services.AddHttpClient<MoondreamService>();
 
 // Add custom services
 builder.Services.AddSingleton<MoondreamService>();
+builder.Services.AddSingleton<BoundingBoxDrawer>();
 builder.Services.AddSingleton<VideoProcessingService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
